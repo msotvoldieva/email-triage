@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars and fill in real values for the target environment
+# (sandbox or a specific client's real project). terraform.tfvars is gitignored --
+# never commit real org/billing/project IDs.
+
+client_name     = "example-practice"
+project_id      = "email-triage-example-practice"
+org_id          = "123456789012"
+# folder_id     = "" # leave commented/null unless this project lives under a folder
+billing_account = "XXXXXX-XXXXXX-XXXXXX"
+region          = "us-central1"

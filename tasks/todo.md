@@ -4,7 +4,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
 
 ## Phase 0: Foundation Infra
 
-- [ ] Task 1: Terraform project bootstrap
+- [x] Task 1: Terraform project bootstrap
   - **Description:** Create the Terraform root module that provisions a new GCP project in the partner company's org, dedicated to this one client, and enables required APIs: Gmail, Vertex AI, Pub/Sub, Cloud Run, BigQuery, Secret Manager, Cloud Scheduler, Cloud Build, IAM, Access Context Manager.
   - **Acceptance criteria:**
     - [ ] `terraform init` succeeds
