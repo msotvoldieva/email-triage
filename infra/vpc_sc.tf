@@ -15,11 +15,11 @@ locals {
   # "what can actually be perimeter-restricted", and conflating the two would silently
   # let an unsupported service (like Gmail) slip in here if main.tf's list ever grows.
   vpc_sc_restricted_services = [
-    "aiplatform.googleapis.com",     # Vertex AI
+    "aiplatform.googleapis.com", # Vertex AI
     "pubsub.googleapis.com",
     "bigquery.googleapis.com",
     "secretmanager.googleapis.com",
-    "firestore.googleapis.com",      # historyId cursor state store only
+    "firestore.googleapis.com", # historyId cursor state store only
     "logging.googleapis.com",
   ]
 

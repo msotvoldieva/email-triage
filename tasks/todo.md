@@ -59,7 +59,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `infra/pubsub.tf`
   - **Estimated scope:** S
 
-- [ ] Task 5: BigQuery audit dataset + table
+- [x] Task 5: BigQuery audit dataset + table
   - **Description:** Create the audit dataset and a `classification_events` table with schema: `message_id STRING, category STRING, confidence FLOAT64, needs_review BOOL, model_version STRING, classified_at TIMESTAMP`. No column capable of holding subject/body text.
   - **Acceptance criteria:**
     - [ ] Table schema matches exactly — reviewed to confirm no free-text/PHI-capable column exists
