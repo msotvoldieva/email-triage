@@ -48,13 +48,14 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `infra/iam.tf`
   - **Estimated scope:** S
 
-- [ ] Task 4: Pub/Sub topic, push subscription, dead-letter topic
-  - **Description:** Create the Gmail-watch topic, a push subscription targeting the (not-yet-deployed) Cloud Run URL with OIDC auth, and a dead-letter topic with a bounded max-delivery-attempts.
+- [x] Task 4: Pub/Sub topic, dead-letter topic, required service-agent IAM grants
+  - **Description:** Create the Gmail-watch topic and a dead-letter topic with a bounded max-delivery-attempts, plus the two Google-managed-service-agent IAM grants both require to function at all. **The push subscription resource itself moves to Task 6** — a push subscription requires a live endpoint URL at creation time, which only exists once Cloud Run is deployed; creating it here would be a forward reference to a resource that doesn't exist yet.
   - **Acceptance criteria:**
-    - [ ] Push subscription has `oidc_token` configured against the Scheduler/invoker SA
-    - [ ] Dead-letter policy set with `max_delivery_attempts` (e.g. 5)
-  - **Verification:** `terraform plan`
-  - **Dependencies:** Task 1, Task 3
+    - [ ] `gmail-api-push@system.gserviceaccount.com` granted `roles/pubsub.publisher` on the Gmail-watch topic — without this, `watch()` succeeds but nothing is ever delivered, a well-documented easy-to-miss step
+    - [ ] The Pub/Sub service agent (`service-{project_number}@gcp-sa-pubsub.iam.gserviceaccount.com`) granted `roles/pubsub.publisher` on the dead-letter topic (the matching `roles/pubsub.subscriber` grant on the source subscription is added in Task 6, alongside the subscription it scopes to)
+    - [ ] Dead-letter topic created with the pipeline's `max_delivery_attempts` bound documented (actual `dead_letter_policy` block lives on the subscription, added in Task 6)
+  - **Verification:** `terraform validate`; `terraform plan`
+  - **Dependencies:** Task 1
   - **Files:** `infra/pubsub.tf`
   - **Estimated scope:** S
 
@@ -74,14 +75,16 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
 
 ## Phase 1: App Skeleton + Push Ingestion
 
-- [ ] Task 6: Cloud Run service scaffold + Pub/Sub push endpoint
-  - **Description:** Minimal Python service (Flask or FastAPI) exposing a push endpoint that verifies the Pub/Sub OIDC bearer token, parses the envelope into `{email_address, history_id}`, and logs receipt with structured logging (no PHI — there is none in the envelope anyway, but the log statement itself must not later be copy-pasted somewhere PHI gets added).
+- [ ] Task 6: Cloud Run service scaffold + Pub/Sub push endpoint + push subscription
+  - **Description:** Minimal Python service (Flask or FastAPI) exposing a push endpoint that verifies the Pub/Sub OIDC bearer token, parses the envelope into `{email_address, history_id}`, and logs receipt with structured logging (no PHI — there is none in the envelope anyway, but the log statement itself must not later be copy-pasted somewhere PHI gets added). Also creates, in `infra/`: the `google_cloud_run_v2_service` resource itself, the `invoker` SA's `roles/run.invoker` binding on it (deferred from Task 3), and the Pub/Sub push subscription (deferred from Task 4) — `push_config.push_endpoint` pointing at the now-known Cloud Run URL, `oidc_token` against the `invoker` SA, and the `dead_letter_policy` block referencing Task 4's dead-letter topic. Also grants the Pub/Sub service agent `roles/pubsub.subscriber` on this subscription (the matching half of Task 4's dead-letter publisher grant) and the Pub/Sub service agent `roles/iam.serviceAccountTokenCreator` on the `invoker` SA (required for Pub/Sub to mint OIDC tokens as that SA).
   - **Acceptance criteria:**
     - [ ] Endpoint returns 401 on missing/invalid OIDC token, 200 on valid push
     - [ ] Envelope parsing handles malformed/missing fields without crashing (400, not 500)
-  - **Verification:** `pytest tests/unit/test_main.py`; `functions-framework --target=handle_pubsub_push --debug` with a sample curl payload
-  - **Dependencies:** Task 4 (needs subscription config to match auth expectations)
-  - **Files:** `src/main.py`, `src/config.py`, `requirements.txt`, `Dockerfile`
+    - [ ] Push subscription's `oidc_token` references the `invoker` SA; `dead_letter_policy.max_delivery_attempts` set (e.g. 5)
+    - [ ] `invoker` SA has `roles/run.invoker` scoped to this specific Cloud Run service only, not project-wide
+  - **Verification:** `pytest tests/unit/test_main.py`; `terraform validate`; `functions-framework --target=handle_pubsub_push --debug` with a sample curl payload
+  - **Dependencies:** Task 3, Task 4
+  - **Files:** `src/main.py`, `src/config.py`, `requirements.txt`, `Dockerfile`, `infra/cloud_run.tf`, `infra/pubsub.tf`
   - **Estimated scope:** M
 
 - [ ] Task 7: Unit tests for push envelope parsing/auth

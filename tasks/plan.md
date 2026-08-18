@@ -68,6 +68,12 @@ live infra, so it can be built and verified well before the sandbox deploy in Ph
 - **Access Context Manager policy is a per-org singleton:** referenced via a variable,
   not created by this module — creating one per client project would fail on the
   second client.
+- **Push subscription created in Task 6, not Task 4:** a Pub/Sub push subscription
+  requires a live endpoint URL at creation time, which only exists once Cloud Run is
+  deployed. Task 4 covers what doesn't have that dependency (the topic, the dead-letter
+  topic, and the two Google-managed-service-agent grants both require regardless of
+  when the subscription itself is created); the subscription resource moves to Task 6,
+  alongside the Cloud Run service whose URL it needs.
 
 ## Task List
 
@@ -76,7 +82,7 @@ live infra, so it can be built and verified well before the sandbox deploy in Ph
 - [ ] Task 2a: VPC-SC service perimeter (6 confirmed-supported services, no Gmail)
 - [ ] Task 2b: Network egress lockdown (VPC connector, no public internet route)
 - [ ] Task 3: IAM — service accounts + cross-org domain-wide delegation prep
-- [ ] Task 4: Pub/Sub topic, push subscription, dead-letter topic
+- [ ] Task 4: Pub/Sub topic, dead-letter topic, required service-agent IAM grants
 - [ ] Task 5: BigQuery audit dataset + table
 
 ### Checkpoint: Foundation Infra
@@ -84,7 +90,7 @@ live infra, so it can be built and verified well before the sandbox deploy in Ph
 - [ ] Human reviews IAM scopes and VPC-SC perimeter membership before `terraform apply`
 
 ### Phase 1: App Skeleton + Push Ingestion
-- [ ] Task 6: Cloud Run service scaffold + Pub/Sub push endpoint
+- [ ] Task 6: Cloud Run service scaffold + Pub/Sub push endpoint + push subscription
 - [ ] Task 7: Unit tests for push envelope parsing/auth
 
 ### Checkpoint: App Skeleton
@@ -162,6 +168,7 @@ live infra, so it can be built and verified well before the sandbox deploy in Ph
 | VPC-SC perimeter blocks a legitimate call, or is misconfigured to fail open | High — either breaks the app or defeats the compliance purpose | Test perimeter in dry-run mode before switching to enforce; explicit human checkpoint before `terraform apply` in Phase 0 |
 | Firestore historyId cursor lost or corrupted | Low/Medium — could reprocess or skip a backlog | On missing state, start from "now" and log a warning rather than replaying full history |
 | Inbox volume/cost scaling | Low (single shared inbox expected low volume) | Revisit if the client later asks to add mailboxes (already gated as "ask first" in the spec) |
+| Partner org has a domain-restricted-sharing org policy (`iam.allowedPolicyMemberDomains`) that blocks granting `gmail-api-push@system.gserviceaccount.com` (a Google-managed identity outside the org's own domain) IAM on the topic | Medium — `watch()` would succeed with no error, but no notifications would ever arrive, and this is hard to notice until real mail doesn't get labeled | Confirm this org policy's status before Task 22's sandbox apply; if enabled, an explicit exception for this specific service account is a documented, standard fix |
 
 ## Open Questions
 
