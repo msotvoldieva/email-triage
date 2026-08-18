@@ -19,6 +19,17 @@ resource "google_project" "this" {
 }
 
 locals {
+  # A fixed, predictable OIDC audience string for Pub/Sub push authentication --
+  # deliberately NOT the Cloud Run service's actual URL. Referencing the service's own
+  # computed .uri from inside its own env block would be a circular reference (the
+  # resource can't depend on its own output), and Cloud Run's real default URL
+  # includes an opaque hash Google assigns that isn't predictable from the project
+  # number anyway. Pub/Sub's push oidc_token.audience accepts any fixed string --
+  # verified against Google's Pub/Sub push-authentication docs -- so both
+  # infra/pubsub.tf's subscription and infra/cloud_run.tf's env var reference this one
+  # value instead, and can never drift apart from each other.
+  push_oidc_audience = "email-triage-${var.client_name}-push"
+
   # Every API this module's pipeline calls at runtime, plus the two platform
   # services (IAM, Access Context Manager) needed to secure it. Keep this list in
   # sync with the "Network isolation" egress list in SPEC-email-triage-core.md --

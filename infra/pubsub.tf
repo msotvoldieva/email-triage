@@ -35,10 +35,62 @@ resource "google_pubsub_topic_iam_member" "gmail_push_publisher" {
 
 # Pub/Sub's own per-project service agent needs Publisher on the dead-letter topic to
 # forward messages there. The matching roles/pubsub.subscriber grant on the *source*
-# subscription is added in Task 6, once that subscription exists.
+# subscription is below, now that Task 6 has created it.
 resource "google_pubsub_topic_iam_member" "dead_letter_publisher" {
   project = google_project.this.project_id
   topic   = google_pubsub_topic.dead_letter.name
   role    = "roles/pubsub.publisher"
   member  = "serviceAccount:service-${google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+# --- Task 6 additions: the push subscription itself, deferred from above because it
+# needs Cloud Run's real URL (infra/cloud_run.tf), which didn't exist until now. ---
+
+resource "google_pubsub_subscription" "gmail_watch_push" {
+  project = google_project.this.project_id
+  name    = "email-triage-${var.client_name}-gmail-watch-push"
+  topic   = google_pubsub_topic.gmail_watch.name
+
+  push_config {
+    # The real Cloud Run URL -- required for actual HTTP delivery and for Cloud Run's
+    # ingress rule to recognize this as same-project internal traffic (infra/cloud_run.tf).
+    push_endpoint = google_cloud_run_v2_service.this.uri
+
+    oidc_token {
+      service_account_email = google_service_account.invoker.email
+      # Fixed string, not the Cloud Run URL -- see local.push_oidc_audience's comment
+      # in infra/main.tf for why.
+      audience = local.push_oidc_audience
+    }
+  }
+
+  dead_letter_policy {
+    dead_letter_topic     = google_pubsub_topic.dead_letter.id
+    max_delivery_attempts = 5
+  }
+
+  ack_deadline_seconds = 60
+
+  depends_on = [
+    google_cloud_run_v2_service_iam_member.invoker_can_invoke,
+    google_pubsub_topic_iam_member.dead_letter_publisher,
+  ]
+}
+
+# The matching half of dead_letter_publisher above: Pub/Sub's service agent needs
+# Subscriber on *this* subscription to read undeliverable messages and forward them.
+resource "google_pubsub_subscription_iam_member" "dead_letter_subscriber" {
+  project      = google_project.this.project_id
+  subscription = google_pubsub_subscription.gmail_watch_push.name
+  role         = "roles/pubsub.subscriber"
+  member       = "serviceAccount:service-${google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
+# Required for Pub/Sub to mint OIDC tokens as the invoker SA when calling the push
+# endpoint -- without this, push delivery fails with a permission error regardless of
+# how the subscription itself is configured.
+resource "google_service_account_iam_member" "pubsub_can_mint_invoker_tokens" {
+  service_account_id = google_service_account.invoker.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${google_project.this.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }

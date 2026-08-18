@@ -73,13 +73,13 @@ subcontractor BA agreement) that this depends on but doesn't resolve.
 ## Commands
 
 ```
-Setup (local):       python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+Setup (local):       python -m venv .venv && source .venv/bin/activate && pip install -r requirements-dev.txt
 Infra plan:           terraform -chdir=infra plan
 Infra apply:          terraform -chdir=infra apply
 Run tests:            pytest --cov=src --cov-report=term-missing
 Lint:                 ruff check src tests
 Format:                ruff format src tests
-Local invoke (dev):    functions-framework --target=handle_pubsub_push --debug
+Local invoke (dev):    (from src/) functions-framework --target=handle_pubsub_push --debug
 Deploy:                gcloud run deploy email-triage --source . --region <region> --no-allow-unauthenticated
 ```
 

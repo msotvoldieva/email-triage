@@ -44,3 +44,9 @@ variable "access_policy_id" {
   description = "Numeric ID of the partner org's existing Access Context Manager policy. An access policy is a singleton per GCP org -- this module references it, it does not create it. Created once, out of band, before the first client project is bootstrapped; every client's service perimeter (infra/vpc_sc.tf) lives under this same policy."
   type        = string
 }
+
+variable "container_image" {
+  description = "Placeholder image for the Cloud Run service's initial creation only. `gcloud run deploy --source .` (Task 22+) publishes the real application image directly; infra/cloud_run.tf's lifecycle.ignore_changes stops a later `terraform apply` from reverting that deploy back to this placeholder."
+  type        = string
+  default     = "us-docker.pkg.dev/cloudrun/container/hello:latest"
+}

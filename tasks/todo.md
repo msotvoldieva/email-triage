@@ -75,7 +75,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
 
 ## Phase 1: App Skeleton + Push Ingestion
 
-- [ ] Task 6: Cloud Run service scaffold + Pub/Sub push endpoint + push subscription
+- [x] Task 6: Cloud Run service scaffold + Pub/Sub push endpoint + push subscription
   - **Description:** Minimal Python service (Flask or FastAPI) exposing a push endpoint that verifies the Pub/Sub OIDC bearer token, parses the envelope into `{email_address, history_id}`, and logs receipt with structured logging (no PHI — there is none in the envelope anyway, but the log statement itself must not later be copy-pasted somewhere PHI gets added). Also creates, in `infra/`: the `google_cloud_run_v2_service` resource itself, the `invoker` SA's `roles/run.invoker` binding on it (deferred from Task 3), and the Pub/Sub push subscription (deferred from Task 4) — `push_config.push_endpoint` pointing at the now-known Cloud Run URL, `oidc_token` against the `invoker` SA, and the `dead_letter_policy` block referencing Task 4's dead-letter topic. Also grants the Pub/Sub service agent `roles/pubsub.subscriber` on this subscription (the matching half of Task 4's dead-letter publisher grant) and the Pub/Sub service agent `roles/iam.serviceAccountTokenCreator` on the `invoker` SA (required for Pub/Sub to mint OIDC tokens as that SA).
   - **Acceptance criteria:**
     - [ ] Endpoint returns 401 on missing/invalid OIDC token, 200 on valid push
@@ -87,7 +87,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `src/main.py`, `src/config.py`, `requirements.txt`, `Dockerfile`, `infra/cloud_run.tf`, `infra/pubsub.tf`
   - **Estimated scope:** M
 
-- [ ] Task 7: Unit tests for push envelope parsing/auth
+- [x] Task 7: Unit tests for push envelope parsing/auth (satisfied by Task 6's TDD flow — see tests/unit/test_main.py)
   - **Description:** Cover valid push, invalid/missing OIDC token, malformed envelope, empty body.
   - **Acceptance criteria:**
     - [ ] All four cases above have a dedicated test
