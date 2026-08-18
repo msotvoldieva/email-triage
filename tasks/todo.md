@@ -297,7 +297,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
 
 ## Phase 8: Documentation & Handoff Prep
 
-- [ ] Task 24: `docs/SETUP.md` — client Workspace admin steps
+- [x] Task 24: `docs/SETUP.md` — client Workspace admin steps
   - **Description:** Step-by-step instructions for the client's Workspace admin covering the cross-org domain-wide delegation flow specifically: authorize the (partner-project-hosted) service account's client ID for domain-wide delegation with the exact OAuth scopes needed, confirm the shared mailbox exists, and the one-time manual bootstrap call to start the initial `watch()`. Written for someone who has never worked across two GCP orgs before.
   - **Acceptance criteria:**
     - [ ] A Workspace admin unfamiliar with this codebase, and unfamiliar with cross-org delegation, could follow it without asking a follow-up question
@@ -306,7 +306,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `docs/SETUP.md`
   - **Estimated scope:** S
 
-- [ ] Task 25: `README.md`
+- [x] Task 25: `README.md`
   - **Description:** Architecture overview (including the cross-org hosting model), how to edit `taxonomy/taxonomy.yaml` and what happens after (no code change needed), how to tune `CONFIDENCE_THRESHOLD`, and a short runbook for whoever owns the "Needs Review" label.
   - **Acceptance criteria:**
     - [ ] Covers all four topics listed above
