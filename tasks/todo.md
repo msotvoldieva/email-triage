@@ -38,7 +38,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `infra/network.tf`
   - **Estimated scope:** S
 
-- [ ] Task 3: IAM — service accounts + cross-org domain-wide delegation prep
+- [x] Task 3: IAM — service accounts + cross-org domain-wide delegation prep
   - **Description:** Create the Cloud Run runtime service account and Scheduler invoker service account with least-privilege IAM bindings (Vertex AI user, BigQuery data editor on the audit dataset only, Pub/Sub subscriber). Output the runtime SA's client ID — this is what the *client's* Workspace admin will authorize for domain-wide delegation (`gmail.readonly`, `gmail.modify`) in *their* Admin console, even though the SA itself lives in the partner's project. That cross-org authorization step is manual and documented in Task 24, not something Terraform can perform.
   - **Acceptance criteria:**
     - [ ] Runtime SA has no roles beyond what `src/` code actually calls (no `roles/editor` or similar broad grants)
