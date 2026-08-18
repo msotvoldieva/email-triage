@@ -4,3 +4,6 @@ pytest==8.*
 pytest-cov==6.*
 pytest-mock==3.*
 ruff==0.*
+
+# Integration tests only (tests/integration/) -- never used by src/ at runtime.
+google-cloud-logging==3.*

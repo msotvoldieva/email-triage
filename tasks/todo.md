@@ -270,7 +270,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
 
 ## Phase 7: End-to-End Integration & Deploy
 
-- [ ] Task 22: `terraform apply` to sandbox project; deploy Cloud Run
+- [ ] Task 22: `terraform apply` to sandbox project; deploy Cloud Run — **BLOCKED: needs real GCP sandbox project + credentials, neither available in the build environment.** `infra/deploy.sh` and `infra/outputs.tf` are written and ready; not yet run.
   - **Description:** Apply the full Phase 0 Terraform against a sandbox GCP project in the partner's org (not the client's real mailbox yet), deploy the built container via `gcloud run deploy`, and manually complete the cross-org domain-wide delegation authorization against a sandbox/test Workspace mailbox the team controls.
   - **Acceptance criteria:**
     - [ ] `terraform apply` completes with no manual out-of-band steps beyond the documented cross-org delegation authorization
@@ -280,7 +280,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `infra/*`, deploy script/CI config
   - **Estimated scope:** M
 
-- [ ] Task 23: Integration tests against synthetic sandbox mailbox
+- [ ] Task 23: Integration tests against synthetic sandbox mailbox — **BLOCKED on Task 22.** `tests/integration/test_end_to_end.py` is written (7 tests: one per placeholder category, the ambiguous->needs_review case, and the no-PHI-in-logs assertion) but UNVERIFIED -- no sandbox exists yet to run it against. Skips cleanly without sandbox env vars; validate for real once Task 22 unblocks.
   - **Description:** Send a handful of synthetic (invented, non-PHI) test emails covering each placeholder taxonomy category plus one deliberately ambiguous one, and assert the correct label lands within a timeout, plus a matching BigQuery audit row.
   - **Acceptance criteria:**
     - [ ] At least one test per placeholder category, plus the ambiguous → needs_review case
