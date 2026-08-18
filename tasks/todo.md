@@ -27,7 +27,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `infra/vpc_sc.tf`
   - **Estimated scope:** S
 
-- [ ] Task 2b: Network egress lockdown
+- [x] Task 2b: Network egress lockdown
   - **Description:** VPC-SC's `restricted_services` alone doesn't stop Cloud Run from making an arbitrary outbound call to a non-Google destination — it governs access to specified Google API resources, not generic internet egress. This task closes that gap: a VPC network + Serverless VPC Access connector, Cloud Run's egress setting routing *all* traffic through it, and no route to the public internet (no Cloud NAT to `0.0.0.0/0`) — Google API traffic only, via Private Google Access / the restricted VIP. This is what actually delivers "nothing egresses outside Google's BAA-covered services."
   - **Acceptance criteria:**
     - [ ] Cloud Run service (once deployed in Task 6) has `vpc_access.egress = ALL_TRAFFIC` through the connector
