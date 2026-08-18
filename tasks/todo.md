@@ -186,7 +186,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
 
 ## Phase 4: Label Application
 
-- [ ] Task 15: `gmail_client.py` — ensure_label_exists / apply_label / dedupe check
+- [x] Task 15: `gmail_client.py` — ensure_label_exists / apply_label / dedupe check
   - **Description:** `ensure_label(label_name) -> label_id` (creates via Gmail API if missing, caches lookups), `apply_label(message_id, label_id)`, and `already_labeled(existing_label_ids, taxonomy) -> bool` to detect a message that already carries any taxonomy label (dedupe against Pub/Sub redelivery).
   - **Acceptance criteria:**
     - [ ] Creating a label that already exists (race with another instance) doesn't error — handles the Gmail API's "already exists" response gracefully

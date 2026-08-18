@@ -11,13 +11,31 @@ import pytest
 from googleapiclient.errors import HttpError
 
 import gmail_client
+import taxonomy
 
 
 @pytest.fixture(autouse=True)
 def _clear_service_cache():
     gmail_client._get_gmail_service.cache_clear()
+    gmail_client._LABEL_NAME_TO_ID_CACHE.clear()
     yield
     gmail_client._get_gmail_service.cache_clear()
+    gmail_client._LABEL_NAME_TO_ID_CACHE.clear()
+
+
+@pytest.fixture
+def sample_taxonomy(tmp_path):
+    path = tmp_path / "taxonomy.yaml"
+    path.write_text(
+        "categories:\n"
+        "  - name: billing\n"
+        "    description: Invoices.\n"
+        "    label: Triage/Billing\n"
+        "  - name: scheduling\n"
+        "    description: Appointments.\n"
+        "    label: Triage/Scheduling\n"
+    )
+    return taxonomy.load_taxonomy(path)
 
 
 def _http_error(status: int) -> HttpError:
@@ -288,3 +306,140 @@ def test_decode_body_handles_missing_padding():
     unpadded = _b64_no_padding("padding test")
 
     assert gmail_client._decode_body(unpadded) == "padding test"
+
+
+# --- Task 15: ensure_label / apply_label / already_labeled ---
+
+
+def _fake_service_with_labels(mocker, labels: list[dict]):
+    fake_service = mocker.Mock()
+    fake_service.users.return_value.labels.return_value.list.return_value.execute.return_value = {
+        "labels": labels
+    }
+    mocker.patch("gmail_client._get_gmail_service", return_value=fake_service)
+    return fake_service
+
+
+def test_ensure_label_returns_existing_id_without_creating(mocker):
+    fake_service = _fake_service_with_labels(mocker, [{"id": "Label_1", "name": "Triage/Billing"}])
+
+    result = gmail_client.ensure_label("mailbox@example.com", "Triage/Billing")
+
+    assert result == "Label_1"
+    fake_service.users.return_value.labels.return_value.create.assert_not_called()
+
+
+def test_ensure_label_creates_when_missing(mocker):
+    fake_service = _fake_service_with_labels(mocker, [])
+    fake_service.users.return_value.labels.return_value.create.return_value.execute.return_value = {
+        "id": "Label_new",
+        "name": "Triage/Billing",
+    }
+
+    result = gmail_client.ensure_label("mailbox@example.com", "Triage/Billing")
+
+    assert result == "Label_new"
+    fake_service.users.return_value.labels.return_value.create.assert_called_once_with(
+        userId="me", body={"name": "Triage/Billing"}
+    )
+
+
+def test_ensure_label_caches_across_calls(mocker):
+    fake_service = _fake_service_with_labels(mocker, [{"id": "Label_1", "name": "Triage/Billing"}])
+
+    gmail_client.ensure_label("mailbox@example.com", "Triage/Billing")
+    gmail_client.ensure_label("mailbox@example.com", "Triage/Billing")
+
+    fake_service.users.return_value.labels.return_value.list.assert_called_once()
+
+
+def test_ensure_label_handles_409_race_by_refetching(mocker):
+    fake_service = _fake_service_with_labels(mocker, [])
+    fake_service.users.return_value.labels.return_value.create.return_value.execute.side_effect = (
+        _http_error(409)
+    )
+    # Second list() call (the refetch after 409) sees the label another
+    # instance just created.
+    fake_service.users.return_value.labels.return_value.list.return_value.execute.side_effect = [
+        {"labels": []},
+        {"labels": [{"id": "Label_raced", "name": "Triage/Billing"}]},
+    ]
+
+    result = gmail_client.ensure_label("mailbox@example.com", "Triage/Billing")
+
+    assert result == "Label_raced"
+
+
+def test_ensure_label_raises_if_409_but_still_not_found_after_refetch(mocker):
+    fake_service = _fake_service_with_labels(mocker, [])
+    fake_service.users.return_value.labels.return_value.create.return_value.execute.side_effect = (
+        _http_error(409)
+    )
+
+    with pytest.raises(HttpError):
+        gmail_client.ensure_label("mailbox@example.com", "Triage/Billing")
+
+
+def test_ensure_label_reraises_non_409_create_errors(mocker):
+    fake_service = _fake_service_with_labels(mocker, [])
+    fake_service.users.return_value.labels.return_value.create.return_value.execute.side_effect = (
+        _http_error(400)
+    )
+
+    with pytest.raises(HttpError):
+        gmail_client.ensure_label("mailbox@example.com", "Reserved/Name")
+
+
+def test_apply_label_calls_modify_with_add_label_ids(mocker):
+    fake_service = mocker.Mock()
+    mocker.patch("gmail_client._get_gmail_service", return_value=fake_service)
+
+    gmail_client.apply_label("mailbox@example.com", "msg-1", "Label_1")
+
+    fake_service.users.return_value.messages.return_value.modify.assert_called_once_with(
+        userId="me", id="msg-1", body={"addLabelIds": ["Label_1"]}
+    )
+
+
+def test_already_labeled_true_when_taxonomy_label_present(mocker, sample_taxonomy):
+    _fake_service_with_labels(mocker, [{"id": "Label_1", "name": "Triage/Billing"}])
+
+    result = gmail_client.already_labeled(
+        "mailbox@example.com", ["INBOX", "Label_1"], sample_taxonomy
+    )
+
+    assert result is True
+
+
+def test_already_labeled_true_for_needs_review_label(mocker, sample_taxonomy):
+    _fake_service_with_labels(mocker, [{"id": "Label_nr", "name": "Triage/Needs Review"}])
+
+    result = gmail_client.already_labeled(
+        "mailbox@example.com", ["INBOX", "Label_nr"], sample_taxonomy
+    )
+
+    assert result is True
+
+
+def test_already_labeled_false_when_no_taxonomy_label_present(mocker, sample_taxonomy):
+    _fake_service_with_labels(mocker, [{"id": "Label_1", "name": "Triage/Billing"}])
+
+    result = gmail_client.already_labeled(
+        "mailbox@example.com", ["INBOX", "UNREAD"], sample_taxonomy
+    )
+
+    assert result is False
+
+
+def test_already_labeled_false_when_taxonomy_label_not_yet_created_in_gmail(
+    mocker, sample_taxonomy
+):
+    """A message can't carry a label that was never created -- an empty
+    Gmail label list (first message ever processed) is a legitimate state,
+    not an error.
+    """
+    _fake_service_with_labels(mocker, [])
+
+    result = gmail_client.already_labeled("mailbox@example.com", ["INBOX"], sample_taxonomy)
+
+    assert result is False

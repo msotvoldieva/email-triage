@@ -16,7 +16,14 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+from taxonomy import Taxonomy
+
 logger = logging.getLogger(__name__)
+
+# Gmail label name -> id, cached per mailbox. A plain dict (not lru_cache) so
+# ensure_label can update a single entry in place after creating a label,
+# rather than invalidating the whole cache.
+_LABEL_NAME_TO_ID_CACHE: dict[str, dict[str, str]] = {}
 
 # Both scopes are authorized in the client's Workspace Admin console for this
 # project's runtime SA (docs/SETUP.md, Task 24) -- gmail.modify is technically a
@@ -185,3 +192,73 @@ def _decode_body(data: str) -> str:
     """
     padded = data + "=" * (-len(data) % 4)
     return base64.urlsafe_b64decode(padded).decode("utf-8", errors="replace")
+
+
+def _get_label_map(subject_email: str, *, force_refresh: bool = False) -> dict[str, str]:
+    if not force_refresh and subject_email in _LABEL_NAME_TO_ID_CACHE:
+        return _LABEL_NAME_TO_ID_CACHE[subject_email]
+
+    service = _get_gmail_service(subject_email)
+    response = service.users().labels().list(userId="me").execute()
+    label_map = {
+        label["name"]: label["id"]
+        for label in response.get("labels", [])
+        if "name" in label and "id" in label
+    }
+    _LABEL_NAME_TO_ID_CACHE[subject_email] = label_map
+    return label_map
+
+
+def ensure_label(subject_email: str, label_name: str) -> str:
+    """Returns the Gmail label ID for label_name, creating it if it doesn't
+    exist yet. The label list is cached per mailbox and refreshed only on a
+    cache miss or a create-time 409, not on every call.
+
+    Handles the race where another instance creates the same label between
+    our lookup and our create call: Gmail's labels.create returns 409 for a
+    genuine name conflict (verified against Google's documented behavior --
+    distinct from the 400 it returns for a reserved-name conflict, which is
+    a real error and should propagate) -- on 409, re-fetch the label list to
+    pick up what the other instance just created, rather than treating it as
+    a failure.
+    """
+    label_map = _get_label_map(subject_email)
+    if label_name in label_map:
+        return label_map[label_name]
+
+    service = _get_gmail_service(subject_email)
+    try:
+        created = service.users().labels().create(userId="me", body={"name": label_name}).execute()
+    except HttpError as exc:
+        if exc.resp.status != 409:
+            raise
+        label_map = _get_label_map(subject_email, force_refresh=True)
+        if label_name not in label_map:
+            raise
+        return label_map[label_name]
+
+    label_id = created["id"]
+    _LABEL_NAME_TO_ID_CACHE.setdefault(subject_email, {})[label_name] = label_id
+    return label_id
+
+
+def apply_label(subject_email: str, message_id: str, label_id: str) -> None:
+    service = _get_gmail_service(subject_email)
+    service.users().messages().modify(
+        userId="me", id=message_id, body={"addLabelIds": [label_id]}
+    ).execute()
+
+
+def already_labeled(subject_email: str, existing_label_ids: list[str], taxonomy: Taxonomy) -> bool:
+    """True if the message already carries any of the taxonomy's labels
+    (including needs-review) -- used to make Pub/Sub redelivery a no-op
+    rather than a duplicate classification/audit write. A taxonomy label
+    that hasn't been created in Gmail yet (e.g. the very first message ever
+    processed) simply can't be on any message -- that's a normal state, not
+    an error.
+    """
+    label_map = _get_label_map(subject_email)
+    taxonomy_label_ids = {
+        label_map[category.label] for category in taxonomy.categories if category.label in label_map
+    }
+    return bool(taxonomy_label_ids.intersection(existing_label_ids))
