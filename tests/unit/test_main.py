@@ -10,8 +10,10 @@ import base64
 import json
 
 import pytest
+from googleapiclient.errors import HttpError
 
 import config
+import gmail_client
 import main
 
 
@@ -61,6 +63,7 @@ class _FakeRequest:
 
 def test_valid_push_returns_200(mocker):
     mocker.patch("main.id_token.verify_oauth2_token", return_value=_valid_claims())
+    mocker.patch("main._process_envelope")
     request = _FakeRequest(
         json_body=_push_envelope(),
         headers={"Authorization": "Bearer fake-token"},
@@ -196,3 +199,88 @@ def test_envelope_data_not_valid_base64_json_returns_400(mocker):
     _body, status = main.handle_pubsub_push(request)
 
     assert status == 400
+
+
+def test_valid_push_calls_process_envelope_with_parsed_envelope(mocker):
+    mocker.patch("main.id_token.verify_oauth2_token", return_value=_valid_claims())
+    process = mocker.patch("main._process_envelope")
+    request = _FakeRequest(
+        json_body=_push_envelope(email_address="mailbox@example.com", history_id="999"),
+        headers={"Authorization": "Bearer fake-token"},
+    )
+
+    main.handle_pubsub_push(request)
+
+    process.assert_called_once_with(
+        main.PushEnvelope(email_address="mailbox@example.com", history_id="999")
+    )
+
+
+# --- _process_envelope (Task 10): wires the push handler to gmail_client + state_store ---
+
+
+def _envelope(email_address="mailbox@example.com", history_id="999"):
+    return main.PushEnvelope(email_address=email_address, history_id=history_id)
+
+
+def test_process_envelope_bootstraps_cursor_when_none_stored(mocker):
+    mocker.patch("main.state_store.get_last_history_id", return_value=None)
+    set_cursor = mocker.patch("main.state_store.set_last_history_id")
+    list_ids = mocker.patch("main.gmail_client.list_new_message_ids")
+    get_message = mocker.patch("main.gmail_client.get_message")
+
+    main._process_envelope(_envelope(history_id="999"))
+
+    list_ids.assert_not_called()
+    get_message.assert_not_called()
+    set_cursor.assert_called_once_with("999")
+
+
+def test_process_envelope_fetches_new_messages_and_updates_cursor(mocker):
+    mocker.patch("main.state_store.get_last_history_id", return_value="500")
+    set_cursor = mocker.patch("main.state_store.set_last_history_id")
+    mocker.patch("main.gmail_client.list_new_message_ids", return_value=["m1", "m2"])
+    get_message = mocker.patch(
+        "main.gmail_client.get_message", return_value=("subject", "body", ["INBOX"])
+    )
+
+    main._process_envelope(_envelope(history_id="999"))
+
+    assert get_message.call_count == 2
+    get_message.assert_any_call("mailbox@example.com", "m1")
+    get_message.assert_any_call("mailbox@example.com", "m2")
+    set_cursor.assert_called_once_with("999")
+
+
+def test_process_envelope_resyncs_on_history_id_expired(mocker):
+    mocker.patch("main.state_store.get_last_history_id", return_value="stale")
+    set_cursor = mocker.patch("main.state_store.set_last_history_id")
+    mocker.patch(
+        "main.gmail_client.list_new_message_ids",
+        side_effect=gmail_client.HistoryIdExpiredError("expired"),
+    )
+    get_message = mocker.patch("main.gmail_client.get_message")
+
+    main._process_envelope(_envelope(history_id="999"))
+
+    get_message.assert_not_called()
+    set_cursor.assert_called_once_with("999")
+
+
+def test_process_envelope_isolates_per_message_fetch_failure(mocker):
+    mocker.patch("main.state_store.get_last_history_id", return_value="500")
+    set_cursor = mocker.patch("main.state_store.set_last_history_id")
+    mocker.patch("main.gmail_client.list_new_message_ids", return_value=["m1", "m2", "m3"])
+
+    def _fake_get_message(_email, message_id):
+        if message_id == "m2":
+            resp = type("_Resp", (), {"status": 404, "reason": "not found"})()
+            raise HttpError(resp=resp, content=b'{"error": {"message": "gone"}}')
+        return ("subject", "body", ["INBOX"])
+
+    get_message = mocker.patch("main.gmail_client.get_message", side_effect=_fake_get_message)
+
+    main._process_envelope(_envelope(history_id="999"))
+
+    assert get_message.call_count == 3
+    set_cursor.assert_called_once_with("999")

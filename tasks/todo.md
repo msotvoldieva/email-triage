@@ -122,7 +122,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `src/state_store.py`
   - **Estimated scope:** S
 
-- [ ] Task 10: Wire push handler to fetch
+- [x] Task 10: Wire push handler to fetch
   - **Description:** On a valid push, read last historyId from the state store, call `list_new_message_ids`, fetch each new message, log the count fetched (metadata only), update state store with new historyId. No classification/labeling yet — this slice proves fetch works end to end.
   - **Acceptance criteria:**
     - [ ] Handler processes a push and updates state store historyId
@@ -132,7 +132,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `src/main.py`
   - **Estimated scope:** S
 
-- [ ] Task 11: Unit tests for gmail_client + state_store
+- [x] Task 11: Unit tests for gmail_client + state_store (pagination + empty-history already covered by Task 8's tests)
   - **Description:** Round out coverage beyond the happy paths already covered in Tasks 8–9 — pagination in `history.list`, empty history, malformed message payload.
   - **Acceptance criteria:**
     - [ ] Pagination case covered
