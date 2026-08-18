@@ -246,7 +246,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
 
 ## Phase 6: Watch Renewal
 
-- [ ] Task 20: Scheduler-triggered `watch()` renewal
+- [x] Task 20: Scheduler-triggered `watch()` renewal
   - **Description:** A route (or separate entrypoint) invoked daily by Cloud Scheduler that calls `gmail_client.start_watch()` again before the 7-day expiry. Infra: `google_cloud_scheduler_job` targeting the Cloud Run renewal route with OIDC auth.
   - **Acceptance criteria:**
     - [ ] Renewal failure logs an actionable error (expiry timestamp, last successful renewal) rather than failing silently
@@ -255,7 +255,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `src/main.py` or `src/renew_watch.py`, `infra/scheduler.tf`
   - **Estimated scope:** S
 
-- [ ] Task 21: Unit tests for renewal + failure logging
+- [x] Task 21: Unit tests for renewal + failure logging
   - **Description:** Cover successful renewal, Gmail API error during renewal, OIDC auth rejection on the endpoint.
   - **Acceptance criteria:**
     - [ ] All three cases above have a dedicated test

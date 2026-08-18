@@ -43,6 +43,22 @@ resource "google_cloud_run_v2_service" "this" {
         name  = "CONFIDENCE_THRESHOLD"
         value = "0.75" # placeholder default -- SPEC-email-triage-core.md Open Questions
       }
+      env {
+        name  = "VERTEX_AI_LOCATION"
+        value = var.region
+      }
+      env {
+        name  = "CLASSIFIER_MODEL"
+        value = var.classifier_model
+      }
+      env {
+        name  = "MAILBOX_ADDRESS"
+        value = var.mailbox_address
+      }
+      env {
+        name  = "GMAIL_WATCH_TOPIC"
+        value = google_pubsub_topic.gmail_watch.id
+      }
     }
   }
 

@@ -1,8 +1,7 @@
-"""Task 9 (tasks/todo.md): Firestore-backed historyId cursor.
+"""Task 9/20 (tasks/todo.md): Firestore-backed historyId cursor + watch-renewal tracking.
 
-This is the cursor store only -- not the PHI content store deferred to v2
-(SPEC-email-triage-core.md "Out of Scope (v1)"). Holds a single history ID
-string, nothing PHI-bearing.
+This is small operational state only -- not the PHI content store deferred to
+v2 (SPEC-email-triage-core.md "Out of Scope (v1)"). Nothing PHI-bearing here.
 """
 
 import pytest
@@ -91,7 +90,7 @@ def test_get_uses_expected_collection_and_document(fake_client):
     state_store.get_last_history_id()
 
     assert fake_client.collection_calls == [state_store._COLLECTION]
-    assert fake_client._collection.document_calls == [state_store._DOCUMENT_ID]
+    assert fake_client._collection.document_calls == [state_store._HISTORY_DOCUMENT_ID]
 
 
 def test_get_last_history_id_missing_field_returns_none(fake_client):
@@ -100,3 +99,26 @@ def test_get_last_history_id_missing_field_returns_none(fake_client):
     result = state_store.get_last_history_id()
 
     assert result is None
+
+
+# --- Task 20: watch renewal tracking ---
+
+
+def test_get_last_watch_renewal_returns_none_when_document_missing(fake_client):
+    result = state_store.get_last_watch_renewal()
+
+    assert result is None
+
+
+def test_watch_renewal_set_then_get_round_trips(fake_client):
+    state_store.set_last_watch_renewal(renewed_at="2026-08-18T00:00:00+00:00", expiration="123456")
+
+    result = state_store.get_last_watch_renewal()
+
+    assert result == {"renewed_at": "2026-08-18T00:00:00+00:00", "expiration": "123456"}
+
+
+def test_watch_renewal_uses_expected_document(fake_client):
+    state_store.get_last_watch_renewal()
+
+    assert fake_client._collection.document_calls == [state_store._WATCH_RENEWAL_DOCUMENT_ID]

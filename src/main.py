@@ -61,9 +61,16 @@ class PushEnvelope:
 
 
 def handle_pubsub_push(request):
-    """functions-framework HTTP entrypoint. Returns (body, status) per Flask's
-    tuple response convention -- functions-framework serves this over HTTP.
+    """functions-framework HTTP entrypoint. Dispatches by path: the Pub/Sub
+    push route (default) vs. the Cloud Scheduler-triggered watch-renewal
+    route (POST /renew-watch, Task 20) -- functions-framework serves one
+    target function per deployment, so this handles both rather than running
+    a second Cloud Run service for a once-daily lightweight call. Returns
+    (body, status) per Flask's tuple response convention.
     """
+    if request.path == "/renew-watch":
+        return _handle_renew_watch(request)
+
     if not _verify_push_request(request):
         return "", 401
 
@@ -184,6 +191,45 @@ def _classify_and_label(
         model_version=config.load_settings().classifier_model,
         classified_at=datetime.now(UTC),
     )
+
+
+def _handle_renew_watch(request):
+    """Cloud Scheduler-triggered watch renewal (Task 20). Reuses
+    _verify_push_request -- Scheduler's OIDC token is issued for the same
+    invoker SA and audience as Pub/Sub's push token, so the same check applies.
+
+    Returns 500 on failure (not just logs it) so Cloud Scheduler's own retry
+    config gets a chance to succeed before the 7-day watch expiry -- this is
+    a deliberate second safety net, not just error visibility.
+    """
+    if not _verify_push_request(request):
+        return "", 401
+
+    settings = config.load_settings()
+
+    try:
+        result = gmail_client.start_watch(settings.mailbox_address, settings.gmail_watch_topic)
+    except Exception:
+        # Broad on purpose, same reasoning as _process_envelope's per-message
+        # catch: start_watch can fail in ways that aren't fully enumerable in
+        # advance, and the priority here is guaranteeing an actionable log
+        # line over narrowing the exception type.
+        last_renewal = state_store.get_last_watch_renewal()
+        logger.exception(
+            "watch.renewal_failed",
+            extra={
+                "last_renewed_at": last_renewal.get("renewed_at") if last_renewal else None,
+                "last_known_expiration": last_renewal.get("expiration") if last_renewal else None,
+            },
+        )
+        return "", 500
+
+    state_store.set_last_watch_renewal(
+        renewed_at=datetime.now(UTC).isoformat(),
+        expiration=str(result.get("expiration", "")),
+    )
+    logger.info("watch.renewed", extra={"expiration": result.get("expiration")})
+    return "", 200
 
 
 def _verify_push_request(request) -> bool:

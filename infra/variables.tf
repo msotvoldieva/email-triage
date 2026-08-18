@@ -50,3 +50,13 @@ variable "container_image" {
   type        = string
   default     = "us-docker.pkg.dev/cloudrun/container/hello:latest"
 }
+
+variable "classifier_model" {
+  description = "Exact Vertex AI Gemini model ID to classify against (e.g. \"gemini-2.5-flash\"). No default -- this is something to verify against the live Vertex AI Model Garden at deploy time, not guess at plan-authoring time (SPEC-email-triage-core.md, src/config.py)."
+  type        = string
+}
+
+variable "mailbox_address" {
+  description = "The shared mailbox's email address this deployment watches (e.g. \"intake@clientdomain.com\"). Client-specific -- no default. Used by the watch-renewal route (Task 20), which has no incoming push envelope to read it from the way the Pub/Sub path does."
+  type        = string
+}

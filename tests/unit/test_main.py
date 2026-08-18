@@ -27,6 +27,8 @@ def _settings_env(monkeypatch):
     )
     monkeypatch.setenv("VERTEX_AI_LOCATION", "us-central1")
     monkeypatch.setenv("CLASSIFIER_MODEL", "gemini-test-model")
+    monkeypatch.setenv("MAILBOX_ADDRESS", "mailbox@example.com")
+    monkeypatch.setenv("GMAIL_WATCH_TOPIC", "projects/test-project/topics/gmail-watch")
     config.load_settings.cache_clear()
     yield
     config.load_settings.cache_clear()
@@ -54,10 +56,11 @@ def _push_envelope(email_address="mailbox@example.com", history_id="123456"):
 class _FakeRequest:
     """Minimal stand-in for a Flask Request -- just what handle_pubsub_push reads."""
 
-    def __init__(self, json_body=None, headers=None, raise_on_json=False):
+    def __init__(self, json_body=None, headers=None, raise_on_json=False, path="/"):
         self._json_body = json_body
         self.headers = headers or {}
         self._raise_on_json = raise_on_json
+        self.path = path
 
     def get_json(self, force=True, silent=False):
         if self._raise_on_json:

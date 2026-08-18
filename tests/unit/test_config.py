@@ -23,6 +23,8 @@ def test_confidence_threshold_defaults_when_unset(monkeypatch):
     monkeypatch.setenv("INVOKER_SERVICE_ACCOUNT_EMAIL", "invoker@example.iam.gserviceaccount.com")
     monkeypatch.setenv("VERTEX_AI_LOCATION", "us-central1")
     monkeypatch.setenv("CLASSIFIER_MODEL", "gemini-test-model")
+    monkeypatch.setenv("MAILBOX_ADDRESS", "mailbox@example.com")
+    monkeypatch.setenv("GMAIL_WATCH_TOPIC", "projects/example/topics/gmail-watch")
     monkeypatch.delenv("CONFIDENCE_THRESHOLD", raising=False)
 
     settings = config.load_settings()
@@ -37,4 +39,15 @@ def test_missing_classifier_model_raises(monkeypatch):
     monkeypatch.delenv("CLASSIFIER_MODEL", raising=False)
 
     with pytest.raises(RuntimeError, match="CLASSIFIER_MODEL"):
+        config.load_settings()
+
+
+def test_missing_mailbox_address_raises(monkeypatch):
+    monkeypatch.setenv("CLOUD_RUN_AUDIENCE", "https://example.run.app")
+    monkeypatch.setenv("INVOKER_SERVICE_ACCOUNT_EMAIL", "invoker@example.iam.gserviceaccount.com")
+    monkeypatch.setenv("VERTEX_AI_LOCATION", "us-central1")
+    monkeypatch.setenv("CLASSIFIER_MODEL", "gemini-test-model")
+    monkeypatch.delenv("MAILBOX_ADDRESS", raising=False)
+
+    with pytest.raises(RuntimeError, match="MAILBOX_ADDRESS"):
         config.load_settings()

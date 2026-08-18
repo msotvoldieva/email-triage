@@ -34,6 +34,8 @@ def _settings_env(monkeypatch):
     monkeypatch.setenv("VERTEX_AI_LOCATION", "us-central1")
     monkeypatch.setenv("CLASSIFIER_MODEL", "gemini-test-model")
     monkeypatch.setenv("CONFIDENCE_THRESHOLD", "0.75")
+    monkeypatch.setenv("MAILBOX_ADDRESS", "mailbox@example.com")
+    monkeypatch.setenv("GMAIL_WATCH_TOPIC", "projects/example/topics/gmail-watch")
     config.load_settings.cache_clear()
     classifier._get_client.cache_clear()
     yield

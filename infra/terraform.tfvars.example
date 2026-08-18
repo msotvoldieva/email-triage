@@ -13,3 +13,10 @@ region          = "us-central1"
 # created once out of band, shared by every client project's perimeter. Look it up
 # with: gcloud access-context-manager policies list --organization=<org_id>
 access_policy_id = "111111111111"
+
+# Verify against the live Vertex AI Model Garden for the target region before
+# setting this for real -- don't just copy this placeholder.
+classifier_model = "gemini-2.5-flash"
+
+# The client's shared mailbox this deployment watches.
+mailbox_address = "intake@example-practice.com"

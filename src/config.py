@@ -19,6 +19,8 @@ class Settings:
     confidence_threshold: float
     vertex_ai_location: str
     classifier_model: str
+    mailbox_address: str
+    gmail_watch_topic: str
 
 
 @lru_cache(maxsize=1)
@@ -31,6 +33,11 @@ def load_settings() -> Settings:
         # No default: an exact, currently-available Vertex AI model ID is something
         # to verify against the live Model Garden at deploy time, not guess now.
         classifier_model=_require_env("CLASSIFIER_MODEL"),
+        # The shared mailbox's address -- the Pub/Sub push path gets this from the
+        # push envelope itself (Gmail tells us), but the Scheduler-triggered watch
+        # renewal (Task 20) has no incoming envelope to read it from.
+        mailbox_address=_require_env("MAILBOX_ADDRESS"),
+        gmail_watch_topic=_require_env("GMAIL_WATCH_TOPIC"),
     )
 
 
