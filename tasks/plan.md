@@ -56,12 +56,25 @@ live infra, so it can be built and verified well before the sandbox deploy in Ph
   is an open question pending pilot data.
 - **No summary generation, no content store (v1):** per `SPEC-email-triage-core.md`'s
   "Out of Scope (v1)" — `classifier.py` returns category/confidence/needs_review only.
+- **VPC-SC + a separate network egress lockdown, not VPC-SC alone:** confirmed against
+  Google's official VPC-SC supported-products list that Gmail API is not a
+  VPC-SC-restrictable service, and that `restricted_services` alone doesn't stop
+  arbitrary outbound calls to non-Google destinations — it governs access to specified
+  Google API resources, not generic internet egress. Two separate controls now cover
+  this: an Access Context Manager perimeter over the six confirmed-supported services
+  (Task 2a), and a VPC + Serverless VPC Access connector with no public internet route
+  (Task 2b). Gmail access itself is governed by IAM/domain-wide delegation scope, not
+  by either network control.
+- **Access Context Manager policy is a per-org singleton:** referenced via a variable,
+  not created by this module — creating one per client project would fail on the
+  second client.
 
 ## Task List
 
 ### Phase 0: Foundation Infra
 - [ ] Task 1: Terraform project bootstrap (partner org, dedicated to this client)
-- [ ] Task 2: VPC-SC perimeter
+- [ ] Task 2a: VPC-SC service perimeter (6 confirmed-supported services, no Gmail)
+- [ ] Task 2b: Network egress lockdown (VPC connector, no public internet route)
 - [ ] Task 3: IAM — service accounts + cross-org domain-wide delegation prep
 - [ ] Task 4: Pub/Sub topic, push subscription, dead-letter topic
 - [ ] Task 5: BigQuery audit dataset + table

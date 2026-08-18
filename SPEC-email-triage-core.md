@@ -53,13 +53,22 @@ subcontractor BA agreement) that this depends on but doesn't resolve.
 - **Scheduling:** Cloud Scheduler (daily Gmail `watch()` renewal — subscriptions expire
   every 7 days)
 - **Secrets:** Secret Manager for any non-identity config (e.g. taxonomy version pin)
-- **IaC:** Terraform — project, VPC-SC perimeter, Cloud Run, Pub/Sub, IAM bindings,
-  BigQuery dataset, Scheduler job
-- **Network isolation:** VPC-SC perimeter around the dedicated GCP project, restricting
-  egress to Gmail API, Vertex AI, Pub/Sub, Secret Manager, Cloud Logging, BigQuery,
-  Firestore (used only for the `historyId` cursor state store — see "Out of Scope (v1)"
-  for why this is not the same thing as a PHI content store) — no other destinations
-  reachable
+- **IaC:** Terraform — project, VPC-SC perimeter, VPC + Serverless VPC Access connector
+  (network egress lockdown), Cloud Run, Pub/Sub, IAM bindings, BigQuery dataset,
+  Scheduler job
+- **Network isolation — two separate controls, not one:**
+  - **VPC-SC service perimeter** over the six GCP services confirmed to support it:
+    Vertex AI, Pub/Sub, BigQuery, Secret Manager, Cloud Logging, Firestore (Firestore
+    used only for the `historyId` cursor state store — see "Out of Scope (v1)" for why
+    this is not a PHI content store). **Gmail API is not a VPC-SC-supported service**,
+    confirmed against Google's official supported-products documentation — it is
+    governed by IAM/domain-wide delegation scope instead, not by the perimeter.
+  - **Network egress lockdown:** Cloud Run's egress routed entirely through a VPC
+    Serverless VPC Access connector, with no route to the public internet (no Cloud NAT
+    to `0.0.0.0/0`) — Google API traffic only, via Private Google Access. This is the
+    control that actually stops an arbitrary outbound call to a non-Google destination;
+    VPC-SC's `restricted_services` alone governs access to specified Google API
+    resources, not generic internet egress from the compute itself.
 
 ## Commands
 
@@ -159,7 +168,8 @@ def classify(subject: str, body: str, taxonomy: Taxonomy) -> ClassificationResul
 
 - **Always do:**
   - Call Vertex AI exclusively via the `aiplatform.googleapis.com` endpoint
-  - Enforce the VPC-SC perimeter around this project's egress
+  - Enforce both the VPC-SC service perimeter (Task 2a) and the network egress
+    lockdown (Task 2b) — the perimeter alone does not stop arbitrary internet egress
   - Keep subject/body out of every log line, exception message, and BigQuery row
   - Use the Cloud Run service account's attached identity — never a downloaded key file
   - Run full test suite before any deploy
@@ -178,7 +188,8 @@ def classify(subject: str, body: str, taxonomy: Taxonomy) -> ClassificationResul
     endpoint (no third-party LLM API, no SaaS error tracker, no analytics SDK)
   - Call the public Gemini Developer API as a fallback for any reason
   - Commit secrets, service account keys, or real client email content to the repo
-  - Disable, narrow-scope-bypass, or punch a hole in the VPC-SC perimeter without sign-off
+  - Disable, narrow-scope-bypass, or punch a hole in the VPC-SC perimeter or the
+    network egress lockdown without sign-off
   - Store PHI in Cloud Logging, BigQuery, or any location outside Gmail itself
 
 ## Out of Scope (v1)
@@ -201,7 +212,8 @@ the dashboard module's build.
 - New messages in the shared inbox receive exactly one category label (or the
   "Needs Review" fallback) within a few minutes of arrival
 - Zero email content ever leaves Google's BAA-covered service surface — verifiable by
-  inspecting VPC-SC perimeter logs and the codebase for any non-Google network call
+  inspecting VPC-SC perimeter violation logs, the VPC's route/firewall config (no
+  public internet route), and the codebase for any non-Google network call
 - 100% of classification decisions produce a BigQuery audit row (message ID, category,
   confidence, model version, timestamp); zero rows ever contain subject/body text
 - `watch()` renews automatically with no coverage gap exceeding a few hours

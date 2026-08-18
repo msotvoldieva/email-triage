@@ -16,14 +16,26 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `infra/main.tf`, `infra/versions.tf`, `infra/variables.tf`
   - **Estimated scope:** S
 
-- [ ] Task 2: VPC-SC perimeter
-  - **Description:** Define an Access Context Manager policy and service perimeter restricting the project's egress to Gmail API, Vertex AI, Pub/Sub, BigQuery, Secret Manager, Cloud Logging, Firestore (Firestore is used here only for the historyId cursor, not PHI storage).
+- [ ] Task 2a: VPC-SC service perimeter (corrected scope)
+  - **Description:** Define a service perimeter, under the partner org's existing (singleton, shared-across-clients) Access Context Manager policy, restricting this project's protected-service access to exactly the six GCP services confirmed to support VPC-SC: `aiplatform.googleapis.com`, `pubsub.googleapis.com`, `bigquery.googleapis.com`, `secretmanager.googleapis.com`, `firestore.googleapis.com`, `logging.googleapis.com`. **Gmail API is not a VPC-SC-supported service** (confirmed against Google's official supported-products list) — it's excluded here and governed instead by IAM/domain-wide delegation scopes (Task 3).
   - **Acceptance criteria:**
-    - [ ] Perimeter resource lists exactly the services named in SPEC-email-triage-core.md — no broader `restricted_services` set
+    - [ ] `restricted_services` lists exactly the six confirmed-supported services — no Gmail, no broader set
+    - [ ] The org's Access Context Manager policy is referenced via a variable (`access_policy_id`), not created by this module — a policy is a singleton per org and must not be re-created per client
     - [ ] Perimeter starts in dry-run mode (`spec` block) so the Phase 0 checkpoint can review violations before enforcing
-  - **Verification:** `terraform plan` diff reviewed line-by-line against the spec's allowed-service list
+  - **Verification:** `terraform validate`; `terraform plan` diff reviewed line-by-line against the spec's allowed-service list
   - **Dependencies:** Task 1
   - **Files:** `infra/vpc_sc.tf`
+  - **Estimated scope:** S
+
+- [ ] Task 2b: Network egress lockdown
+  - **Description:** VPC-SC's `restricted_services` alone doesn't stop Cloud Run from making an arbitrary outbound call to a non-Google destination — it governs access to specified Google API resources, not generic internet egress. This task closes that gap: a VPC network + Serverless VPC Access connector, Cloud Run's egress setting routing *all* traffic through it, and no route to the public internet (no Cloud NAT to `0.0.0.0/0`) — Google API traffic only, via Private Google Access / the restricted VIP. This is what actually delivers "nothing egresses outside Google's BAA-covered services."
+  - **Acceptance criteria:**
+    - [ ] Cloud Run service (once deployed in Task 6) has `vpc_access.egress = ALL_TRAFFIC` through the connector
+    - [ ] The VPC has no default route to the public internet — verified by inspecting route/firewall config, not just by absence of a NAT resource
+    - [ ] Google API traffic resolves via the restricted VIP (`199.36.153.4/30`) over Private Google Access
+  - **Verification:** `terraform validate`; manual review of route table once applied in Task 22's sandbox
+  - **Dependencies:** Task 1
+  - **Files:** `infra/network.tf`
   - **Estimated scope:** S
 
 - [ ] Task 3: IAM — service accounts + cross-org domain-wide delegation prep
