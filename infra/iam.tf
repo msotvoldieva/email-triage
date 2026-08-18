@@ -51,6 +51,18 @@ resource "google_project_iam_member" "runtime_firestore_user" {
   member  = "serviceAccount:${google_service_account.cloud_run_runtime.email}"
 }
 
+# Task 8 addition: the runtime SA needs to sign JWTs AS ITSELF to perform keyless
+# domain-wide delegation (src/gmail_client.py's _build_delegated_credentials, via
+# google.auth.iam.Signer). This is a self-referential grant -- the SA is both the
+# principal being granted the role and the resource the role is granted on -- which
+# is the documented pattern for this specific keyless-delegation mechanism, not an
+# accidental over-grant.
+resource "google_service_account_iam_member" "runtime_can_sign_as_self" {
+  service_account_id = google_service_account.cloud_run_runtime.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.cloud_run_runtime.email}"
+}
+
 # The runtime SA's unique numeric ID -- this is what the client's Workspace admin
 # pastes into Admin console > Security > API Controls > Domain-wide Delegation as the
 # "Client ID", authorizing it for gmail.readonly + gmail.modify scoped to the one

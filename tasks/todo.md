@@ -102,7 +102,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
 
 ## Phase 2: Gmail Integration (Fetch)
 
-- [ ] Task 8: `gmail_client.py` — watch/history.list/get
+- [x] Task 8: `gmail_client.py` — watch/history.list/get
   - **Description:** Wrapper functions: `start_watch(topic_name)`, `list_new_message_ids(start_history_id)`, `get_message(message_id) -> (subject, body, existing_label_ids)`. Uses the Cloud Run attached SA credentials via cross-org domain-wide delegation (subject impersonation of the shared mailbox address).
   - **Acceptance criteria:**
     - [ ] `list_new_message_ids` handles a `404`/expired-history-id response by signaling "resync needed" rather than crashing
