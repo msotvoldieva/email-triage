@@ -30,6 +30,7 @@ locals {
     "pubsub.googleapis.com",
     "run.googleapis.com", # Cloud Run
     "bigquery.googleapis.com",
+    "firestore.googleapis.com", # historyId cursor state store only (Task 9) -- not the deferred PHI content store
     "secretmanager.googleapis.com",
     "cloudscheduler.googleapis.com",
     "cloudbuild.googleapis.com", # Cloud Run container builds/deploys

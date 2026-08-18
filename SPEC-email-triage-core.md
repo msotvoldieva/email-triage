@@ -56,8 +56,10 @@ subcontractor BA agreement) that this depends on but doesn't resolve.
 - **IaC:** Terraform — project, VPC-SC perimeter, Cloud Run, Pub/Sub, IAM bindings,
   BigQuery dataset, Scheduler job
 - **Network isolation:** VPC-SC perimeter around the dedicated GCP project, restricting
-  egress to Gmail API, Vertex AI, Pub/Sub, Secret Manager, Cloud Logging, BigQuery — no
-  other destinations reachable
+  egress to Gmail API, Vertex AI, Pub/Sub, Secret Manager, Cloud Logging, BigQuery,
+  Firestore (used only for the `historyId` cursor state store — see "Out of Scope (v1)"
+  for why this is not the same thing as a PHI content store) — no other destinations
+  reachable
 
 ## Commands
 
