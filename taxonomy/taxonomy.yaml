@@ -34,3 +34,12 @@ categories:
       uncategorized message. Distinct from needs-review, which is for
       low-confidence or ambiguous classifications, not a topic in itself.
     label: Triage/General
+
+  - name: personal
+    description: >
+      Family or personal correspondence unrelated to practice business --
+      this mailbox is also used for some personal/family email. Added for
+      near-term testing against the real mailbox before the client's
+      taxonomy workshop; may not exist in the final taxonomy if the client's
+      real mailbox is business-only.
+    label: Triage/Personal
