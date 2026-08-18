@@ -221,7 +221,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
 
 ## Phase 5: Audit Logging
 
-- [ ] Task 18: `audit.py` — BigQuery metadata-only event write
+- [x] Task 18: `audit.py` — BigQuery metadata-only event write
   - **Description:** `write_event(message_id, category, confidence, needs_review, model_version, classified_at)`. Function signature has no parameter through which subject/body could be passed — enforced structurally, not just by convention.
   - **Acceptance criteria:**
     - [ ] Function signature has exactly the metadata fields listed in SPEC-email-triage-core.md's BigQuery schema, nothing else
