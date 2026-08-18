@@ -148,7 +148,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
 
 ## Phase 3: Taxonomy + Classification
 
-- [ ] Task 12: `taxonomy.py` + placeholder `taxonomy.yaml`
+- [x] Task 12: `taxonomy.py` + placeholder `taxonomy.yaml`
   - **Description:** Load and validate `taxonomy/taxonomy.yaml` (category name, description, Gmail label name) into a typed `Taxonomy` object. Ship a placeholder taxonomy (e.g. `billing`, `clinical`, `scheduling`, `general-inquiry`, `needs-review`) clearly marked as provisional pending the client workshop.
   - **Acceptance criteria:**
     - [ ] Invalid/malformed YAML raises a clear validation error at load time, not at classification time

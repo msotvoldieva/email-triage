@@ -6,3 +6,4 @@ google-auth==2.*
 requests==2.*
 google-api-python-client==2.*
 google-cloud-firestore==2.*
+PyYAML==6.*

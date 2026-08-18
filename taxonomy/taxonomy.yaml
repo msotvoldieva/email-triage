@@ -1,0 +1,36 @@
+# PLACEHOLDER TAXONOMY -- provisional pending the client workshop.
+# See SPEC-email-triage-core.md, Open Questions: "Final taxonomy/categories".
+# Do not treat these category names, descriptions, or Gmail label names as
+# final -- they exist so the pipeline has something concrete to build and test
+# against before the real taxonomy is defined with the client.
+#
+# Do NOT add a "needs-review" category here -- it's reserved, managed by
+# src/taxonomy.py, and always present regardless of what's configured below.
+# Adding it here raises a validation error at load time.
+
+categories:
+  - name: billing
+    description: >
+      Invoices, payments, insurance claims, billing disputes, and
+      payment-plan questions.
+    label: Triage/Billing
+
+  - name: clinical
+    description: >
+      Clinical questions, symptom reports, prescription/refill requests,
+      lab or test result questions.
+    label: Triage/Clinical
+
+  - name: scheduling
+    description: >
+      Appointment requests, reschedules, cancellations, and availability
+      questions.
+    label: Triage/Scheduling
+
+  - name: general-inquiry
+    description: >
+      Anything that doesn't clearly fit billing, clinical, or scheduling --
+      the catch-all for a confidently-classified but otherwise
+      uncategorized message. Distinct from needs-review, which is for
+      low-confidence or ambiguous classifications, not a topic in itself.
+    label: Triage/General
