@@ -15,6 +15,7 @@ import base64
 import json
 import logging
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 
@@ -24,6 +25,7 @@ from google.oauth2 import id_token
 from googleapiclient.errors import HttpError
 from werkzeug.exceptions import BadRequest
 
+import audit
 import classifier
 import config
 import gmail_client
@@ -168,6 +170,20 @@ def _classify_and_label(
     label_name = taxonomy.label_for(result.category)
     label_id = gmail_client.ensure_label(subject_email, label_name)
     gmail_client.apply_label(subject_email, message_id, label_id)
+
+    # After labeling succeeds, not before -- a message that fails to label
+    # doesn't get an audit row either (it raises before reaching this line,
+    # caught by _process_envelope's per-message isolation). Consistent with
+    # "one audit row per successfully classified+labeled message," not "one
+    # row per attempt."
+    audit.write_event(
+        message_id=message_id,
+        category=result.category,
+        confidence=result.confidence,
+        needs_review=result.needs_review,
+        model_version=config.load_settings().classifier_model,
+        classified_at=datetime.now(UTC),
+    )
 
 
 def _verify_push_request(request) -> bool:

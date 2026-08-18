@@ -231,7 +231,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `src/audit.py`
   - **Estimated scope:** S
 
-- [ ] Task 19: Wire audit write into handler
+- [x] Task 19: Wire audit write into handler
   - **Description:** After labeling (or after landing in needs_review), call `audit.write_event(...)`.
   - **Acceptance criteria:**
     - [ ] Every classified message — including needs_review — produces exactly one audit row

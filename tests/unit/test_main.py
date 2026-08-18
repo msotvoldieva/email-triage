@@ -250,6 +250,12 @@ def sample_taxonomy(tmp_path, mocker):
     )
     result = taxonomy.load_taxonomy(path)
     mocker.patch("main._get_taxonomy", return_value=result)
+    # Mocked here, not just per-test: any test reaching the labeling success
+    # path calls audit.write_event, which would otherwise hit real BigQuery ->
+    # _get_client() -> a network call this sandbox can't make. Same failure
+    # mode as the apply_label incident (Task 16) -- baking the mock into the
+    # shared fixture means a future test can't reintroduce it by omission.
+    mocker.patch("main.audit.write_event")
     return result
 
 
@@ -367,6 +373,130 @@ def test_process_envelope_low_confidence_applies_needs_review_label(mocker, samp
 
     ensure_label.assert_called_once_with("mailbox@example.com", "Triage/Needs Review")
     apply_label.assert_called_once_with("mailbox@example.com", "m1", "Label_nr")
+
+
+# --- Task 19: audit write, after successful labeling ---
+
+
+def test_process_envelope_writes_audit_event_after_labeling(mocker, sample_taxonomy):
+    mocker.patch("main.state_store.get_last_history_id", return_value="500")
+    mocker.patch("main.state_store.set_last_history_id")
+    mocker.patch("main.gmail_client.list_new_message_ids", return_value=["m1"])
+    mocker.patch("main.gmail_client.get_message", return_value=("subject", "body", ["INBOX"]))
+    mocker.patch("main.gmail_client.already_labeled", return_value=False)
+    mocker.patch(
+        "main.classifier.classify",
+        return_value=classifier.ClassificationResult(
+            category="billing", confidence=0.9, needs_review=False
+        ),
+    )
+    mocker.patch("main.gmail_client.ensure_label", return_value="Label_1")
+    mocker.patch("main.gmail_client.apply_label")
+    write_event = mocker.patch("main.audit.write_event")
+
+    main._process_envelope(_envelope(history_id="999"))
+
+    write_event.assert_called_once_with(
+        message_id="m1",
+        category="billing",
+        confidence=0.9,
+        needs_review=False,
+        model_version="gemini-test-model",
+        classified_at=mocker.ANY,
+    )
+
+
+def test_process_envelope_writes_audit_event_for_needs_review_too(mocker, sample_taxonomy):
+    mocker.patch("main.state_store.get_last_history_id", return_value="500")
+    mocker.patch("main.state_store.set_last_history_id")
+    mocker.patch("main.gmail_client.list_new_message_ids", return_value=["m1"])
+    mocker.patch("main.gmail_client.get_message", return_value=("subject", "body", ["INBOX"]))
+    mocker.patch("main.gmail_client.already_labeled", return_value=False)
+    mocker.patch(
+        "main.classifier.classify",
+        return_value=classifier.ClassificationResult(
+            category=taxonomy.NEEDS_REVIEW_CATEGORY, confidence=0.3, needs_review=True
+        ),
+    )
+    mocker.patch("main.gmail_client.ensure_label", return_value="Label_nr")
+    mocker.patch("main.gmail_client.apply_label")
+    write_event = mocker.patch("main.audit.write_event")
+
+    main._process_envelope(_envelope(history_id="999"))
+
+    write_event.assert_called_once_with(
+        message_id="m1",
+        category=taxonomy.NEEDS_REVIEW_CATEGORY,
+        confidence=0.3,
+        needs_review=True,
+        model_version="gemini-test-model",
+        classified_at=mocker.ANY,
+    )
+
+
+def test_process_envelope_no_audit_write_on_classify_failure(mocker, sample_taxonomy):
+    mocker.patch("main.state_store.get_last_history_id", return_value="500")
+    mocker.patch("main.state_store.set_last_history_id")
+    mocker.patch("main.gmail_client.list_new_message_ids", return_value=["m1"])
+    mocker.patch("main.gmail_client.get_message", return_value=("subject", "body", ["INBOX"]))
+    mocker.patch("main.gmail_client.already_labeled", return_value=False)
+    mocker.patch("main.classifier.classify", side_effect=TimeoutError("timed out"))
+    write_event = mocker.patch("main.audit.write_event")
+
+    main._process_envelope(_envelope(history_id="999"))
+
+    # No successful classification -> nothing valid to audit for this message.
+    write_event.assert_not_called()
+
+
+def test_process_envelope_no_audit_write_when_skipped_as_already_labeled(mocker, sample_taxonomy):
+    mocker.patch("main.state_store.get_last_history_id", return_value="500")
+    mocker.patch("main.state_store.set_last_history_id")
+    mocker.patch("main.gmail_client.list_new_message_ids", return_value=["m1"])
+    mocker.patch(
+        "main.gmail_client.get_message",
+        return_value=("subject", "body", ["INBOX", "Label_1"]),
+    )
+    mocker.patch("main.gmail_client.already_labeled", return_value=True)
+    write_event = mocker.patch("main.audit.write_event")
+
+    main._process_envelope(_envelope(history_id="999"))
+
+    write_event.assert_not_called()
+
+
+def test_process_envelope_audit_call_never_receives_subject_or_body(mocker, sample_taxonomy):
+    """Task 18 already enforces this structurally (write_event's signature has
+    no subject/body parameter at all), but this confirms the call SITE here
+    doesn't somehow smuggle message content through one of the six legitimate
+    parameters either (e.g. passing body as model_version by mistake).
+    """
+    secret_subject = "SECRET_SUBJECT_MARKER"
+    secret_body = "SECRET_BODY_MARKER"
+
+    mocker.patch("main.state_store.get_last_history_id", return_value="500")
+    mocker.patch("main.state_store.set_last_history_id")
+    mocker.patch("main.gmail_client.list_new_message_ids", return_value=["m1"])
+    mocker.patch(
+        "main.gmail_client.get_message",
+        return_value=(secret_subject, secret_body, ["INBOX"]),
+    )
+    mocker.patch("main.gmail_client.already_labeled", return_value=False)
+    mocker.patch(
+        "main.classifier.classify",
+        return_value=classifier.ClassificationResult(
+            category="billing", confidence=0.9, needs_review=False
+        ),
+    )
+    mocker.patch("main.gmail_client.ensure_label", return_value="Label_1")
+    mocker.patch("main.gmail_client.apply_label")
+    write_event = mocker.patch("main.audit.write_event")
+
+    main._process_envelope(_envelope(history_id="999"))
+
+    call_values = list(write_event.call_args.kwargs.values())
+    assert secret_subject not in call_values
+    assert secret_body not in call_values
 
 
 def test_process_envelope_isolates_classify_failure_per_message(mocker, sample_taxonomy):
