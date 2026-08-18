@@ -17,6 +17,8 @@ class Settings:
     cloud_run_audience: str
     invoker_service_account_email: str
     confidence_threshold: float
+    vertex_ai_location: str
+    classifier_model: str
 
 
 @lru_cache(maxsize=1)
@@ -25,6 +27,10 @@ def load_settings() -> Settings:
         cloud_run_audience=_require_env("CLOUD_RUN_AUDIENCE"),
         invoker_service_account_email=_require_env("INVOKER_SERVICE_ACCOUNT_EMAIL"),
         confidence_threshold=float(os.environ.get("CONFIDENCE_THRESHOLD", "0.75")),
+        vertex_ai_location=_require_env("VERTEX_AI_LOCATION"),
+        # No default: an exact, currently-available Vertex AI model ID is something
+        # to verify against the live Model Garden at deploy time, not guess now.
+        classifier_model=_require_env("CLASSIFIER_MODEL"),
     )
 
 

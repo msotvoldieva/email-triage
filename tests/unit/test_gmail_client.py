@@ -113,6 +113,18 @@ def test_list_new_message_ids_empty_history_returns_empty_list(mocker):
     assert result == []
 
 
+def test_list_new_message_ids_skips_entries_missing_message_id(mocker):
+    fake_service = mocker.Mock()
+    fake_service.users.return_value.history.return_value.list.return_value.execute.return_value = {
+        "history": [{"messagesAdded": [{"message": {}}, {"message": {"id": "m1"}}]}],
+    }
+    mocker.patch("gmail_client._get_gmail_service", return_value=fake_service)
+
+    result = gmail_client.list_new_message_ids("mailbox@example.com", "100")
+
+    assert result == ["m1"]
+
+
 def test_list_new_message_ids_raises_history_expired_on_404(mocker):
     fake_service = mocker.Mock()
     fake_service.users.return_value.history.return_value.list.return_value.execute.side_effect = (
@@ -219,6 +231,38 @@ def test_get_message_missing_subject_header_returns_empty_string(mocker):
     subject, _body, _labels = gmail_client.get_message("mailbox@example.com", "msg-4")
 
     assert subject == ""
+
+
+def test_get_message_falls_through_when_plain_text_part_has_no_data(mocker):
+    """A text/plain part with no body.data (e.g. it's an attachment reference,
+    not inline content) shouldn't short-circuit -- extraction should keep
+    looking rather than returning empty/crashing.
+    """
+    fake_service = mocker.Mock()
+    fake_service.users.return_value.messages.return_value.get.return_value.execute.return_value = {
+        "labelIds": [],
+        "payload": {
+            "headers": [{"name": "Subject", "value": "Empty plain part"}],
+            "mimeType": "multipart/mixed",
+            "parts": [
+                {"mimeType": "text/plain", "body": {}},
+                {
+                    "mimeType": "multipart/alternative",
+                    "parts": [
+                        {
+                            "mimeType": "text/plain",
+                            "body": {"data": _b64_no_padding("nested body")},
+                        },
+                    ],
+                },
+            ],
+        },
+    }
+    mocker.patch("gmail_client._get_gmail_service", return_value=fake_service)
+
+    _subject, body, _labels = gmail_client.get_message("mailbox@example.com", "msg-6")
+
+    assert body == "nested body"
 
 
 def test_get_message_returns_empty_body_when_no_part_has_data(mocker):

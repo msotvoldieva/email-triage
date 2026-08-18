@@ -23,6 +23,8 @@ def _settings_env(monkeypatch):
     monkeypatch.setenv(
         "INVOKER_SERVICE_ACCOUNT_EMAIL", "invoker@test-project.iam.gserviceaccount.com"
     )
+    monkeypatch.setenv("VERTEX_AI_LOCATION", "us-central1")
+    monkeypatch.setenv("CLASSIFIER_MODEL", "gemini-test-model")
     config.load_settings.cache_clear()
     yield
     config.load_settings.cache_clear()

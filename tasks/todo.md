@@ -158,7 +158,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `src/taxonomy.py`, `taxonomy/taxonomy.yaml`
   - **Estimated scope:** S
 
-- [ ] Task 13: `classifier.py` — Vertex AI Gemini structured-output call + threshold logic
+- [x] Task 13: `classifier.py` — Vertex AI Gemini structured-output call + threshold logic
   - **Description:** `classify(subject, body, taxonomy) -> ClassificationResult` returning category/confidence/needs_review only — no summary field (deferred to v2, see SPEC's "Out of Scope (v1)"). Builds a prompt embedding the taxonomy, calls Vertex AI (`aiplatform.googleapis.com` client — never the public Gemini API) with a JSON response schema constrained to the taxonomy's category enum, parses the result, and sets `needs_review=True` when confidence is below `settings.CONFIDENCE_THRESHOLD` (default `0.75`) or the response fails to parse/validate.
   - **Acceptance criteria:**
     - [ ] Uses the Vertex AI SDK/endpoint exclusively — verified by code review, not just tests
@@ -170,7 +170,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `src/classifier.py`
   - **Estimated scope:** M
 
-- [ ] Task 14: Unit tests — prompt construction, response parsing, threshold edge cases
+- [x] Task 14: Unit tests — prompt construction, response parsing, threshold edge cases
   - **Description:** Cover: valid high-confidence response, valid low-confidence response (→ needs_review), malformed JSON response, category outside taxonomy enum, empty subject/body input, Vertex AI client exception/timeout.
   - **Acceptance criteria:**
     - [ ] All six cases above have a dedicated test
