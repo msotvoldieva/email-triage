@@ -112,7 +112,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `src/gmail_client.py`
   - **Estimated scope:** M
 
-- [ ] Task 9: Firestore-backed `historyId` cursor state store
+- [x] Task 9: Firestore-backed `historyId` cursor state store
   - **Description:** `get_last_history_id()` / `set_last_history_id(value)` against a single Firestore document. On missing document, returns `None` (caller treats this as "start from now"). This is a cursor only — not the PHI content store deferred to v2, holds no email content.
   - **Acceptance criteria:**
     - [ ] Read/write round-trips correctly
