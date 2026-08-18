@@ -12,9 +12,11 @@ import json
 import pytest
 from googleapiclient.errors import HttpError
 
+import classifier
 import config
 import gmail_client
 import main
+import taxonomy
 
 
 @pytest.fixture(autouse=True)
@@ -203,6 +205,20 @@ def test_envelope_data_not_valid_base64_json_returns_400(mocker):
     assert status == 400
 
 
+def test_get_taxonomy_loads_the_real_bundled_file():
+    """Unlike gmail_client/classifier/state_store's external-service calls,
+    loading the taxonomy is just a local file read -- worth exercising for
+    real rather than always mocking it out, same reasoning as
+    test_taxonomy.py's test_real_taxonomy_yaml_file_loads_successfully.
+    """
+    main._get_taxonomy.cache_clear()
+
+    result = main._get_taxonomy()
+
+    assert taxonomy.NEEDS_REVIEW_CATEGORY in result.category_names()
+    main._get_taxonomy.cache_clear()
+
+
 def test_valid_push_calls_process_envelope_with_parsed_envelope(mocker):
     mocker.patch("main.id_token.verify_oauth2_token", return_value=_valid_claims())
     process = mocker.patch("main._process_envelope")
@@ -218,11 +234,23 @@ def test_valid_push_calls_process_envelope_with_parsed_envelope(mocker):
     )
 
 
-# --- _process_envelope (Task 10): wires the push handler to gmail_client + state_store ---
+# --- _process_envelope (Task 10 fetch, Task 16 classify+label): wires the push
+# handler to gmail_client + state_store + classifier ---
 
 
 def _envelope(email_address="mailbox@example.com", history_id="999"):
     return main.PushEnvelope(email_address=email_address, history_id=history_id)
+
+
+@pytest.fixture
+def sample_taxonomy(tmp_path, mocker):
+    path = tmp_path / "taxonomy.yaml"
+    path.write_text(
+        "categories:\n  - name: billing\n    description: Invoices.\n    label: Triage/Billing\n"
+    )
+    result = taxonomy.load_taxonomy(path)
+    mocker.patch("main._get_taxonomy", return_value=result)
+    return result
 
 
 def test_process_envelope_bootstraps_cursor_when_none_stored(mocker):
@@ -235,22 +263,6 @@ def test_process_envelope_bootstraps_cursor_when_none_stored(mocker):
 
     list_ids.assert_not_called()
     get_message.assert_not_called()
-    set_cursor.assert_called_once_with("999")
-
-
-def test_process_envelope_fetches_new_messages_and_updates_cursor(mocker):
-    mocker.patch("main.state_store.get_last_history_id", return_value="500")
-    set_cursor = mocker.patch("main.state_store.set_last_history_id")
-    mocker.patch("main.gmail_client.list_new_message_ids", return_value=["m1", "m2"])
-    get_message = mocker.patch(
-        "main.gmail_client.get_message", return_value=("subject", "body", ["INBOX"])
-    )
-
-    main._process_envelope(_envelope(history_id="999"))
-
-    assert get_message.call_count == 2
-    get_message.assert_any_call("mailbox@example.com", "m1")
-    get_message.assert_any_call("mailbox@example.com", "m2")
     set_cursor.assert_called_once_with("999")
 
 
@@ -269,10 +281,19 @@ def test_process_envelope_resyncs_on_history_id_expired(mocker):
     set_cursor.assert_called_once_with("999")
 
 
-def test_process_envelope_isolates_per_message_fetch_failure(mocker):
+def test_process_envelope_isolates_per_message_fetch_failure(mocker, sample_taxonomy):
     mocker.patch("main.state_store.get_last_history_id", return_value="500")
     set_cursor = mocker.patch("main.state_store.set_last_history_id")
     mocker.patch("main.gmail_client.list_new_message_ids", return_value=["m1", "m2", "m3"])
+    mocker.patch("main.gmail_client.already_labeled", return_value=False)
+    mocker.patch(
+        "main.classifier.classify",
+        return_value=classifier.ClassificationResult(
+            category="billing", confidence=0.9, needs_review=False
+        ),
+    )
+    mocker.patch("main.gmail_client.ensure_label", return_value="Label_1")
+    mocker.patch("main.gmail_client.apply_label")
 
     def _fake_get_message(_email, message_id):
         if message_id == "m2":
@@ -285,4 +306,114 @@ def test_process_envelope_isolates_per_message_fetch_failure(mocker):
     main._process_envelope(_envelope(history_id="999"))
 
     assert get_message.call_count == 3
+    set_cursor.assert_called_once_with("999")
+
+
+def test_process_envelope_skips_classification_when_already_labeled(mocker, sample_taxonomy):
+    mocker.patch("main.state_store.get_last_history_id", return_value="500")
+    mocker.patch("main.state_store.set_last_history_id")
+    mocker.patch("main.gmail_client.list_new_message_ids", return_value=["m1"])
+    mocker.patch(
+        "main.gmail_client.get_message",
+        return_value=("subject", "body", ["INBOX", "Label_1"]),
+    )
+    mocker.patch("main.gmail_client.already_labeled", return_value=True)
+    classify = mocker.patch("main.classifier.classify")
+    ensure_label = mocker.patch("main.gmail_client.ensure_label")
+
+    main._process_envelope(_envelope(history_id="999"))
+
+    classify.assert_not_called()
+    ensure_label.assert_not_called()
+
+
+def test_process_envelope_classifies_and_labels_new_message(mocker, sample_taxonomy):
+    mocker.patch("main.state_store.get_last_history_id", return_value="500")
+    mocker.patch("main.state_store.set_last_history_id")
+    mocker.patch("main.gmail_client.list_new_message_ids", return_value=["m1"])
+    mocker.patch("main.gmail_client.get_message", return_value=("subject", "body", ["INBOX"]))
+    mocker.patch("main.gmail_client.already_labeled", return_value=False)
+    mocker.patch(
+        "main.classifier.classify",
+        return_value=classifier.ClassificationResult(
+            category="billing", confidence=0.9, needs_review=False
+        ),
+    )
+    ensure_label = mocker.patch("main.gmail_client.ensure_label", return_value="Label_1")
+    apply_label = mocker.patch("main.gmail_client.apply_label")
+
+    main._process_envelope(_envelope(history_id="999"))
+
+    ensure_label.assert_called_once_with("mailbox@example.com", "Triage/Billing")
+    apply_label.assert_called_once_with("mailbox@example.com", "m1", "Label_1")
+
+
+def test_process_envelope_low_confidence_applies_needs_review_label(mocker, sample_taxonomy):
+    mocker.patch("main.state_store.get_last_history_id", return_value="500")
+    mocker.patch("main.state_store.set_last_history_id")
+    mocker.patch("main.gmail_client.list_new_message_ids", return_value=["m1"])
+    mocker.patch("main.gmail_client.get_message", return_value=("subject", "body", ["INBOX"]))
+    mocker.patch("main.gmail_client.already_labeled", return_value=False)
+    mocker.patch(
+        "main.classifier.classify",
+        return_value=classifier.ClassificationResult(
+            category=taxonomy.NEEDS_REVIEW_CATEGORY, confidence=0.3, needs_review=True
+        ),
+    )
+    ensure_label = mocker.patch("main.gmail_client.ensure_label", return_value="Label_nr")
+    apply_label = mocker.patch("main.gmail_client.apply_label")
+
+    main._process_envelope(_envelope(history_id="999"))
+
+    ensure_label.assert_called_once_with("mailbox@example.com", "Triage/Needs Review")
+    apply_label.assert_called_once_with("mailbox@example.com", "m1", "Label_nr")
+
+
+def test_process_envelope_isolates_classify_failure_per_message(mocker, sample_taxonomy):
+    mocker.patch("main.state_store.get_last_history_id", return_value="500")
+    set_cursor = mocker.patch("main.state_store.set_last_history_id")
+    mocker.patch("main.gmail_client.list_new_message_ids", return_value=["m1", "m2"])
+    mocker.patch("main.gmail_client.get_message", return_value=("subject", "body", ["INBOX"]))
+    mocker.patch("main.gmail_client.already_labeled", return_value=False)
+    classify = mocker.patch(
+        "main.classifier.classify",
+        side_effect=[
+            TimeoutError("upstream timed out"),
+            classifier.ClassificationResult(category="billing", confidence=0.9, needs_review=False),
+        ],
+    )
+    apply_label = mocker.patch("main.gmail_client.apply_label")
+    mocker.patch("main.gmail_client.ensure_label", return_value="Label_1")
+
+    main._process_envelope(_envelope(history_id="999"))
+
+    assert classify.call_count == 2
+    # m1 failed and was skipped -- only m2 got labeled, but the batch didn't abort
+    apply_label.assert_called_once_with("mailbox@example.com", "m2", "Label_1")
+    set_cursor.assert_called_once_with("999")
+
+
+def test_process_envelope_isolates_label_failure_per_message(mocker, sample_taxonomy):
+    mocker.patch("main.state_store.get_last_history_id", return_value="500")
+    set_cursor = mocker.patch("main.state_store.set_last_history_id")
+    mocker.patch("main.gmail_client.list_new_message_ids", return_value=["m1", "m2"])
+    mocker.patch("main.gmail_client.get_message", return_value=("subject", "body", ["INBOX"]))
+    mocker.patch("main.gmail_client.already_labeled", return_value=False)
+    mocker.patch(
+        "main.classifier.classify",
+        return_value=classifier.ClassificationResult(
+            category="billing", confidence=0.9, needs_review=False
+        ),
+    )
+    resp = type("_Resp", (), {"status": 500, "reason": "error"})()
+    ensure_label = mocker.patch(
+        "main.gmail_client.ensure_label",
+        side_effect=[HttpError(resp=resp, content=b"{}"), "Label_1"],
+    )
+    apply_label = mocker.patch("main.gmail_client.apply_label")
+
+    main._process_envelope(_envelope(history_id="999"))
+
+    assert ensure_label.call_count == 2
+    apply_label.assert_called_once_with("mailbox@example.com", "m2", "Label_1")
     set_cursor.assert_called_once_with("999")

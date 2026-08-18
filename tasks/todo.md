@@ -196,7 +196,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `src/gmail_client.py`
   - **Estimated scope:** S
 
-- [ ] Task 16: Wire classify → label into push handler
+- [x] Task 16: Wire classify → label into push handler
   - **Description:** Extend the Task 10 handler: for each fetched message not already labeled, call `classify()`, resolve category → label via taxonomy, `ensure_label` + `apply_label`.
   - **Acceptance criteria:**
     - [ ] Already-labeled messages skip classification entirely (saves a Vertex AI call, not just a label write)
@@ -206,7 +206,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `src/main.py`
   - **Estimated scope:** M
 
-- [ ] Task 17: Unit tests for label creation/apply/dedupe
+- [x] Task 17: Unit tests for label creation/apply/dedupe (covered across Task 15/16's tests)
   - **Description:** Cover label-already-exists race, dedupe skip path, partial-batch-failure isolation.
   - **Acceptance criteria:**
     - [ ] All three cases above have a dedicated test
