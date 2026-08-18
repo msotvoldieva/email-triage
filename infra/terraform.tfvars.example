@@ -8,3 +8,8 @@ org_id          = "123456789012"
 # folder_id     = "" # leave commented/null unless this project lives under a folder
 billing_account = "XXXXXX-XXXXXX-XXXXXX"
 region          = "us-central1"
+
+# The partner org's existing Access Context Manager policy ID -- a singleton per org,
+# created once out of band, shared by every client project's perimeter. Look it up
+# with: gcloud access-context-manager policies list --organization=<org_id>
+access_policy_id = "111111111111"

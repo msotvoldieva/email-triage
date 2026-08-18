@@ -16,7 +16,7 @@ Plan: `tasks/plan.md` · Spec: `SPEC-email-triage-core.md` · Map: `CAPABILITY_M
   - **Files:** `infra/main.tf`, `infra/versions.tf`, `infra/variables.tf`
   - **Estimated scope:** S
 
-- [ ] Task 2a: VPC-SC service perimeter (corrected scope)
+- [x] Task 2a: VPC-SC service perimeter (corrected scope)
   - **Description:** Define a service perimeter, under the partner org's existing (singleton, shared-across-clients) Access Context Manager policy, restricting this project's protected-service access to exactly the six GCP services confirmed to support VPC-SC: `aiplatform.googleapis.com`, `pubsub.googleapis.com`, `bigquery.googleapis.com`, `secretmanager.googleapis.com`, `firestore.googleapis.com`, `logging.googleapis.com`. **Gmail API is not a VPC-SC-supported service** (confirmed against Google's official supported-products list) — it's excluded here and governed instead by IAM/domain-wide delegation scopes (Task 3).
   - **Acceptance criteria:**
     - [ ] `restricted_services` lists exactly the six confirmed-supported services — no Gmail, no broader set

@@ -39,3 +39,8 @@ variable "region" {
   type        = string
   default     = "us-central1"
 }
+
+variable "access_policy_id" {
+  description = "Numeric ID of the partner org's existing Access Context Manager policy. An access policy is a singleton per GCP org -- this module references it, it does not create it. Created once, out of band, before the first client project is bootstrapped; every client's service perimeter (infra/vpc_sc.tf) lives under this same policy."
+  type        = string
+}
